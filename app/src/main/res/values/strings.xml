@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">文件工具箱</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">首页</string>
+    <string name="nav_photo">照片</string>
+    <string name="nav_pdf">PDF</string>
+    <string name="nav_word">Word</string>
+    <string name="nav_excel">Excel</string>
+    
+    <!-- Photo Module -->
+    <string name="photo_background_replace">背景替换</string>
+    <string name="photo_scan_to_pdf">扫描成PDF</string>
+    <string name="photo_compress">图片压缩</string>
+    <string name="photo_select">选择图片</string>
+    <string name="photo_take">拍照</string>
+    
+    <!-- PDF Module -->
+    <string name="pdf_split">PDF拆分</string>
+    <string name="pdf_extract_page">提取页面</string>
+    <string name="pdf_extract_image">提取图片</string>
+    <string name="pdf_select">选择PDF文件</string>
+    
+    <!-- Word Module -->
+    <string name="word_to_pdf">Word转PDF</string>
+    <string name="word_merge">文档合并</string>
+    <string name="word_extract_image">提取图片</string>
+    <string name="word_select">选择Word文件</string>
+    
+    <!-- Excel Module -->
+    <string name="excel_to_pdf">Excel转PDF</string>
+    <string name="csv_to_excel">CSV转Excel</string>
+    <string name="excel_merge">表格合并</string>
+    <string name="excel_select">选择Excel文件</string>
+    
+    <!-- Common -->
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确认</string>
+    <string name="processing">处理中…</string>
+    <string name="success">操作成功</string>
+    <string name="failed">操作失败</string>
+    <string name="coming_soon">功能开发中</string>
+    
+    <!-- Permissions -->
+    <string name="permission_camera">需要相机权限来拍照</string>
+    <string name="permission_storage">需要存储权限来访问文件</string>
+</resources>

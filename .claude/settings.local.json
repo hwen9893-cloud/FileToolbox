@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(./gradlew assembleRelease:*)",
+      "Bash(export JAVA_HOME:*)",
+      "Bash(export PATH=\"$JAVA_HOME/bin:$PATH\")",
+      "Bash(export ANDROID_HOME:*)",
+      "Bash(ssh:*)",
+      "Bash(brew install:*)",
+      "Bash(gh auth status:*)",
+      "Bash(git init:*)",
+      "Bash(git -C /Users/hwen/Documents/Cursor/FileToolbox status -s)",
+      "Bash(git -C /Users/hwen/Documents/Cursor/FileToolbox diff --staged)",
+      "Bash(git -C /Users/hwen/Documents/Cursor/FileToolbox add:*)"
+    ]
+  }
+}
