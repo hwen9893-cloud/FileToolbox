@@ -207,6 +207,8 @@ fun PhotoScanToPdfScreen(navController: NavController) {
                                     enhanced.compress(Bitmap.CompressFormat.JPEG, 98, baos)
                                 }
                                 val imageData = ImageDataFactory.create(baos.toByteArray())
+                                // Set 300 DPI for high-quality print rendering
+                                imageData.setDpi(300, 300)
                                 val image = Image(imageData)
 
                                 val pageWidth = PageSize.A4.width - 72f
@@ -216,7 +218,6 @@ fun PhotoScanToPdfScreen(navController: NavController) {
                                 val scale = minOf(widthScale, heightScale)
                                 image.scale(scale, scale)
 
-                                pdfDocument.addNewPage(PageSize.A4)
                                 document.add(image)
 
                                 enhanced.recycle()
@@ -861,16 +862,16 @@ private fun applyGrayscaleEnhance(src: Bitmap): Bitmap {
         if (v < minV) minV = v
         if (v > maxV) maxV = v
     }
-    // Keep some headroom for paper whites
-    val lo = minV + ((maxV - minV) * 0.02f).toInt()
-    val hi = maxV - ((maxV - minV) * 0.02f).toInt()
+    // Keep headroom to avoid clipping shadows/highlights
+    val lo = minV + ((maxV - minV) * 0.05f).toInt()
+    val hi = maxV - ((maxV - minV) * 0.05f).toInt()
     val range = (hi - lo).coerceAtLeast(1).toFloat()
 
     // Build a lookup table for speed
     val lut = IntArray(256) { v ->
         val normalized = ((v - lo) / range).coerceIn(0f, 1f)
-        // Apply S-curve contrast with gamma ≈ 0.7 (brightens midtones)
-        val contrasted = Math.pow(normalized.toDouble(), 0.7).toFloat()
+        // Gentle gamma — 0.9 preserves natural tones, avoids over-brightening
+        val contrasted = Math.pow(normalized.toDouble(), 0.9).toFloat()
         (contrasted * 255f + 0.5f).toInt().coerceIn(0, 255)
     }
 
@@ -900,8 +901,8 @@ private fun applyAdaptiveThreshold(src: Bitmap): Bitmap {
     val localMean = boxBlur(denoised, w, h, radius)
 
     // Step 3: Apply threshold: pixel < localMean * (1 - C) → black, else white
-    // C controls sensitivity; lower = more aggressive whitening of background
-    val c = 0.08f
+    // C controls sensitivity; higher = more whitening of background, less dark ink
+    val c = 0.15f
     val result = IntArray(w * h)
     for (i in denoised.indices) {
         val threshold = (localMean[i] * (1.0f - c)).toInt()
@@ -949,12 +950,12 @@ private fun applyUsmSharpen(src: Bitmap): Bitmap {
         if (v < minV) minV = v
         if (v > maxV) maxV = v
     }
-    val lo = minV + ((maxV - minV) * 0.02f).toInt()
-    val hi = maxV - ((maxV - minV) * 0.02f).toInt()
+    val lo = minV + ((maxV - minV) * 0.05f).toInt()
+    val hi = maxV - ((maxV - minV) * 0.05f).toInt()
     val range = (hi - lo).coerceAtLeast(1).toFloat()
     val lut = IntArray(256) { v ->
         val n = ((v - lo) / range).coerceIn(0f, 1f)
-        val c = Math.pow(n.toDouble(), 0.75).toFloat()
+        val c = Math.pow(n.toDouble(), 0.9).toFloat()
         (c * 255f + 0.5f).toInt().coerceIn(0, 255)
     }
     val enhanced = IntArray(w * h)
@@ -988,16 +989,15 @@ private fun applySuperClearScan(src: Bitmap): Bitmap {
     val h = src.height
     val gray = toGrayscaleArray(src)
 
-    // Step 1: Two-pass denoise for heavy noise reduction
-    val pass1 = gaussianBlur5x5(gray, w, h)
-    val denoised = gaussianBlur5x5(pass1, w, h)
+    // Step 1: Single-pass denoise (two-pass loses too much detail)
+    val denoised = gaussianBlur5x5(gray, w, h)
 
     // Step 2: Adaptive threshold with tighter parameters
     val radius = (minOf(w, h) / 8).coerceIn(15, 80)
     val localMean = boxBlur(denoised, w, h, radius)
 
-    // Use a slightly less aggressive threshold to preserve fine details
-    val c = 0.06f
+    // Higher C = more background whitening, less heavy ink
+    val c = 0.12f
     val thresholded = IntArray(w * h)
     for (i in denoised.indices) {
         val threshold = (localMean[i] * (1.0f - c)).toInt()
