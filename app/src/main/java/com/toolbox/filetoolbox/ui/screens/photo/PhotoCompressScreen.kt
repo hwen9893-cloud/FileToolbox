@@ -47,6 +47,7 @@ fun PhotoCompressScreen(navController: NavController) {
     var targetSizeKb by remember { mutableFloatStateOf(500f) }
     var isProcessing by remember { mutableStateOf(false) }
     var compressedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var compressedBytes by remember { mutableStateOf<ByteArray?>(null) }
     var resultMessage by remember { mutableStateOf<String?>(null) }
     var outputFileName by remember { mutableStateOf("") }
     
@@ -58,12 +59,16 @@ fun PhotoCompressScreen(navController: NavController) {
         uri?.let {
             selectedImageUri = it
             compressedBitmap = null
+            compressedBytes = null
             compressedSize = 0L
             resultMessage = null
-            
-            // Get original file size
-            context.contentResolver.openInputStream(it)?.use { stream ->
-                originalSize = stream.available().toLong()
+
+            // Get original file size via ContentResolver query
+            context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
+                val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                if (sizeIndex >= 0 && cursor.moveToFirst()) {
+                    originalSize = cursor.getLong(sizeIndex)
+                }
             }
         }
     }
@@ -76,41 +81,47 @@ fun PhotoCompressScreen(navController: NavController) {
                 
                 withContext(Dispatchers.IO) {
                     try {
-                        val inputStream = context.contentResolver.openInputStream(uri)
-                        val originalBitmap = BitmapFactory.decodeStream(inputStream)
-                        inputStream?.close()
-                        
+                        val originalBitmap = context.contentResolver.openInputStream(uri)?.use {
+                            BitmapFactory.decodeStream(it)
+                        }
+
                         if (originalBitmap != null) {
-                            var quality = 95
-                            var compressed: ByteArray
-                            val targetBytes = (targetSizeKb * 1024).toLong()
-                            
-                            // Binary search for optimal quality
-                            var minQuality = 10
-                            var maxQuality = 95
-                            
-                            while (minQuality <= maxQuality) {
-                                quality = (minQuality + maxQuality) / 2
-                                val outputStream = ByteArrayOutputStream()
-                                originalBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
-                                compressed = outputStream.toByteArray()
-                                
-                                if (compressed.size > targetBytes) {
-                                    maxQuality = quality - 1
-                                } else {
-                                    minQuality = quality + 1
+                            try {
+                                var quality = 95
+                                var compressed: ByteArray
+                                val targetBytes = (targetSizeKb * 1024).toLong()
+
+                                // Binary search for optimal quality
+                                var minQuality = 10
+                                var maxQuality = 95
+
+                                while (minQuality <= maxQuality) {
+                                    quality = (minQuality + maxQuality) / 2
+                                    val outputStream = ByteArrayOutputStream()
+                                    originalBitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream)
+                                    compressed = outputStream.toByteArray()
+
+                                    if (compressed.size > targetBytes) {
+                                        maxQuality = quality - 1
+                                    } else {
+                                        minQuality = quality + 1
+                                    }
                                 }
+
+                                // Final compression with found quality
+                                val finalQuality = maxOf(quality, 10)
+                                val finalOutputStream = ByteArrayOutputStream()
+                                originalBitmap.compress(Bitmap.CompressFormat.JPEG, finalQuality, finalOutputStream)
+                                compressed = finalOutputStream.toByteArray()
+
+                                compressedSize = compressed.size.toLong()
+                                compressedBytes = compressed
+                                compressedBitmap = BitmapFactory.decodeByteArray(compressed, 0, compressed.size)
+
+                                resultMessage = "压缩完成！质量: $finalQuality%"
+                            } finally {
+                                originalBitmap.recycle()
                             }
-                            
-                            // Final compression with found quality
-                            val finalOutputStream = ByteArrayOutputStream()
-                            originalBitmap.compress(Bitmap.CompressFormat.JPEG, maxOf(quality, 10), finalOutputStream)
-                            compressed = finalOutputStream.toByteArray()
-                            
-                            compressedSize = compressed.size.toLong()
-                            compressedBitmap = BitmapFactory.decodeByteArray(compressed, 0, compressed.size)
-                            
-                            resultMessage = "压缩完成！质量: ${maxOf(quality, 10)}%"
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
@@ -124,26 +135,27 @@ fun PhotoCompressScreen(navController: NavController) {
     }
     
     fun saveCompressedImage() {
-        compressedBitmap?.let { bitmap ->
-            scope.launch {
-                isProcessing = true
-                
-                withContext(Dispatchers.IO) {
-                    try {
-                        val fileName = outputFileName.ifBlank { "$defaultBaseName.jpg" }
-                        val saved = FileSaver.saveImage(
-                            context, bitmap, fileName,
-                            Bitmap.CompressFormat.JPEG, 95
-                        )
-                        resultMessage = if (saved != null) "已保存到相册: $fileName" else "保存失败"
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        resultMessage = "保存失败: ${e.message}"
+        val bytes = compressedBytes ?: return
+        scope.launch {
+            isProcessing = true
+
+            withContext(Dispatchers.IO) {
+                try {
+                    val fileName = outputFileName.ifBlank { "$defaultBaseName.jpg" }
+                    // Save the already-compressed bytes directly to preserve exact compression
+                    val saved = FileSaver.saveDocument(
+                        context, fileName, "image/jpeg"
+                    ) { out ->
+                        out.write(bytes)
                     }
+                    resultMessage = if (saved != null) "已保存到相册: $fileName" else "保存失败"
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    resultMessage = "保存失败: ${e.message}"
                 }
-                
-                isProcessing = false
             }
+
+            isProcessing = false
         }
     }
     

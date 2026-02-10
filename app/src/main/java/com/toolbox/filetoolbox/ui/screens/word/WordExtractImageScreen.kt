@@ -52,13 +52,15 @@ fun WordExtractImageScreen(navController: NavController) {
     ) { uri ->
         uri?.let {
             selectedDocUri = it
+            extractedImages.forEach { bmp -> bmp.recycle() }
             extractedImages = emptyList()
             resultMessage = null
 
             context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
                 val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                cursor.moveToFirst()
-                docFileName = cursor.getString(nameIndex) ?: "unknown.docx"
+                if (nameIndex >= 0 && cursor.moveToFirst()) {
+                    docFileName = cursor.getString(nameIndex) ?: "unknown.docx"
+                }
             }
         }
     }
@@ -71,9 +73,9 @@ fun WordExtractImageScreen(navController: NavController) {
 
                 withContext(Dispatchers.IO) {
                     try {
-                        val inputStream = context.contentResolver.openInputStream(uri)
-                        val doc = XWPFDocument(inputStream)
-                        inputStream?.close()
+                        val docBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            ?: throw Exception("无法读取文件")
+                        val doc = XWPFDocument(java.io.ByteArrayInputStream(docBytes))
 
                         val images = mutableListOf<Bitmap>()
 

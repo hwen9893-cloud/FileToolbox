@@ -59,8 +59,9 @@ fun ExcelMergeScreen(navController: NavController) {
                 var name = "unknown.xlsx"
                 context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                     val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    cursor.moveToFirst()
-                    name = cursor.getString(nameIndex) ?: "unknown.xlsx"
+                    if (nameIndex >= 0 && cursor.moveToFirst()) {
+                        name = cursor.getString(nameIndex) ?: "unknown.xlsx"
+                    }
                 }
                 ExcelFile(uri, name)
             }
@@ -87,9 +88,9 @@ fun ExcelMergeScreen(navController: NavController) {
                     val mergedWorkbook = XSSFWorkbook()
 
                     selectedFiles.forEachIndexed { fileIdx, excelFile ->
-                        val inputStream = context.contentResolver.openInputStream(excelFile.uri)
-                        val sourceWorkbook = WorkbookFactory.create(inputStream)
-                        inputStream?.close()
+                        val excelBytes = context.contentResolver.openInputStream(excelFile.uri)?.use { it.readBytes() }
+                            ?: throw Exception("无法读取文件: ${excelFile.name}")
+                        val sourceWorkbook = WorkbookFactory.create(java.io.ByteArrayInputStream(excelBytes))
 
                         for (sheetIdx in 0 until sourceWorkbook.numberOfSheets) {
                             val sourceSheet = sourceWorkbook.getSheetAt(sheetIdx)

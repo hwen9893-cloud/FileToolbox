@@ -125,12 +125,17 @@ fun PhotoBackgroundReplaceScreen(navController: NavController) {
                 val result = suspendCancellableCoroutine { cont ->
                     segmenter.process(inputImage)
                         .addOnSuccessListener { mask ->
-                            cont.resume(mask)
+                            if (cont.isActive) cont.resume(mask)
                         }
                         .addOnFailureListener { e ->
-                            cont.resume(null)
-                            resultMessage = "人像识别失败: ${e.message}"
+                            if (cont.isActive) {
+                                resultMessage = "人像识别失败: ${e.message}"
+                                cont.resume(null)
+                            }
                         }
+                    cont.invokeOnCancellation {
+                        // ML Kit task will complete but resume is guarded by isActive
+                    }
                 }
 
                 if (result != null) {

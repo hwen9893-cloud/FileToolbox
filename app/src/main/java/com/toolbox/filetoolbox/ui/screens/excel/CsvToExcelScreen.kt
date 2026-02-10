@@ -58,27 +58,27 @@ fun CsvToExcelScreen(navController: NavController) {
 
             context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
                 val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                cursor.moveToFirst()
-                csvFileName = cursor.getString(nameIndex) ?: "unknown.csv"
+                if (nameIndex >= 0 && cursor.moveToFirst()) {
+                    csvFileName = cursor.getString(nameIndex) ?: "unknown.csv"
+                }
             }
 
             // Read preview
             scope.launch {
                 withContext(Dispatchers.IO) {
                     try {
-                        val inputStream = context.contentResolver.openInputStream(it)
-                        val reader = BufferedReader(InputStreamReader(inputStream))
-                        val lines = mutableListOf<String>()
-                        var count = 0
-                        reader.forEachLine { line ->
-                            if (count < 5) {
-                                lines.add(line)
-                                count++
+                        context.contentResolver.openInputStream(it)?.use { stream ->
+                            val reader = BufferedReader(InputStreamReader(stream))
+                            val lines = mutableListOf<String>()
+                            var count = 0
+                            reader.forEachLine { line ->
+                                if (count < 5) {
+                                    lines.add(line)
+                                    count++
+                                }
                             }
+                            previewLines = lines
                         }
-                        reader.close()
-                        inputStream?.close()
-                        previewLines = lines
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -95,8 +95,9 @@ fun CsvToExcelScreen(navController: NavController) {
 
                 withContext(Dispatchers.IO) {
                     try {
-                        val inputStream = context.contentResolver.openInputStream(uri)
-                        val reader = BufferedReader(InputStreamReader(inputStream))
+                        val csvBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            ?: throw Exception("无法读取文件")
+                        val reader = BufferedReader(InputStreamReader(java.io.ByteArrayInputStream(csvBytes)))
 
                         val workbook = XSSFWorkbook()
                         val sheet = workbook.createSheet("Sheet1")
@@ -132,7 +133,6 @@ fun CsvToExcelScreen(navController: NavController) {
                         }
 
                         reader.close()
-                        inputStream?.close()
 
                         // Auto-size columns
                         val firstRow = sheet.getRow(0)

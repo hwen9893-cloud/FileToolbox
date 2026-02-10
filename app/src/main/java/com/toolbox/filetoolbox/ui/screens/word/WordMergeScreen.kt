@@ -57,8 +57,9 @@ fun WordMergeScreen(navController: NavController) {
                 var name = "unknown.docx"
                 context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                     val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    cursor.moveToFirst()
-                    name = cursor.getString(nameIndex) ?: "unknown.docx"
+                    if (nameIndex >= 0 && cursor.moveToFirst()) {
+                        name = cursor.getString(nameIndex) ?: "unknown.docx"
+                    }
                 }
                 DocFile(uri, name)
             }
@@ -85,9 +86,9 @@ fun WordMergeScreen(navController: NavController) {
                     val mergedDoc = XWPFDocument()
 
                     selectedDocs.forEachIndexed { index, docFile ->
-                        val inputStream = context.contentResolver.openInputStream(docFile.uri)
-                        val sourceDoc = XWPFDocument(inputStream)
-                        inputStream?.close()
+                        val docBytes = context.contentResolver.openInputStream(docFile.uri)?.use { it.readBytes() }
+                            ?: throw Exception("无法读取文件: ${docFile.name}")
+                        val sourceDoc = XWPFDocument(java.io.ByteArrayInputStream(docBytes))
 
                         // Add page break between documents (except before first)
                         if (index > 0) {

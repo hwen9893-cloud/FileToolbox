@@ -65,19 +65,21 @@ fun ExcelToPdfScreen(navController: NavController) {
 
             context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
                 val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                cursor.moveToFirst()
-                excelFileName = cursor.getString(nameIndex) ?: "unknown.xlsx"
+                if (nameIndex >= 0 && cursor.moveToFirst()) {
+                    excelFileName = cursor.getString(nameIndex) ?: "unknown.xlsx"
+                }
             }
 
             // Read sheet count
             scope.launch {
                 withContext(Dispatchers.IO) {
                     try {
-                        val inputStream = context.contentResolver.openInputStream(it)
-                        val workbook = WorkbookFactory.create(inputStream)
-                        sheetCount = workbook.numberOfSheets
-                        workbook.close()
-                        inputStream?.close()
+                        val bytes = context.contentResolver.openInputStream(it)?.use { s -> s.readBytes() }
+                        if (bytes != null) {
+                            val workbook = WorkbookFactory.create(java.io.ByteArrayInputStream(bytes))
+                            sheetCount = workbook.numberOfSheets
+                            workbook.close()
+                        }
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -94,9 +96,9 @@ fun ExcelToPdfScreen(navController: NavController) {
 
                 withContext(Dispatchers.IO) {
                     try {
-                        val inputStream = context.contentResolver.openInputStream(uri)
-                        val workbook = WorkbookFactory.create(inputStream)
-                        inputStream?.close()
+                        val excelBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                            ?: throw Exception("无法读取文件")
+                        val workbook = WorkbookFactory.create(java.io.ByteArrayInputStream(excelBytes))
 
                         val finalName = outputFileName.ifBlank { "$defaultBaseName.pdf" }
 

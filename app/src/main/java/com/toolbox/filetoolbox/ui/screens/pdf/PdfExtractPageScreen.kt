@@ -76,8 +76,9 @@ fun PdfExtractPageScreen(navController: NavController) {
                         
                         context.contentResolver.query(it, null, null, null, null)?.use { cursor ->
                             val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                            cursor.moveToFirst()
-                            pdfFileName = cursor.getString(nameIndex) ?: "unknown.pdf"
+                            if (nameIndex >= 0 && cursor.moveToFirst()) {
+                                pdfFileName = cursor.getString(nameIndex) ?: "unknown.pdf"
+                            }
                         }
                     } catch (e: Exception) {
                         e.printStackTrace()
